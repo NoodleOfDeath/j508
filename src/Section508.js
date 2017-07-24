@@ -41,9 +41,11 @@ $.enumerate('Section508.Rule', {
     A_BlankTarget : null, //
     A_MissingTabindex : null, //
     A_MissingTitle : null, //
+    A_WindowTarget : null,
     Button_MissingTabindex : null,//
     Button_MissingTitle : null, //
     DataToggle_RestoreTitle : null, //
+    Img_MissingTabindex : null,
     TD_MissingScope : null, //
     TH_MissingScope : null, //
     All : 'MAX_VALUE',
@@ -55,14 +57,16 @@ $.enumerate('Section508.Rule', {
 Section508.Message =
     {
 
-        A_BlankTarget : 'Adding missing sr-only element after blank target hyperlink. :: %O',
-        A_MissingTabindex : 'Setting missing tabindex as 0 for hyperlink :: %O',
-        A_MissingTitle : 'Setting missing title as "%s" for hyperlink :: %O',
-        Button_MissingTabIndex : 'Setting missing tabindex as 0 for hyperlink :: %O',
-        Button_MissingTitle : 'Setting missing title as "%s" for button :: %O',
+        A_BlankTarget : 'Inserting missing sr-only element after blank target hyperlink. :: %O',
+        A_MissingTabindex : 'Adding missing tabindex attribute as 0 for hyperlink :: %O',
+        A_MissingTitle : 'Adding missing title attribute as "%s" for hyperlink :: %O',
+        A_WindowTarget : 'Inserting missing sr-only element after window target hyperlink. :: %O',
+        Button_MissingTabindex : 'Adding missing tabindex as 0 for hyperlink :: %O',
+        Button_MissingTitle : 'Adding missing title attribute as "%s" for button :: %O',
         DataToggle_RestoreTitle : 'Restoring title as "%s" for data-toggle :: %O',
-        TD_MissingScope : '',
-        TH_MissingScope : '',
+        Img_MissingTabindex : 'Adding missing tabindex as 0 for image :: %O',
+        TD_MissingScope : 'Adding missing scope attribute as "%s" for table data-cell :: %O',
+        TH_MissingScope : 'Adding missing scope attribute as "%s" for table data-cell :: %O',
 
         WARNING_A_MissingTitle : 'WARNING: Unable to find an appropriate title for anonymous hyperlink. The title "%s" was used instead.',
 
@@ -128,7 +132,7 @@ Section508.unhookTabIndex = function(id) {
  * The second parameter is a standard key-value configuration object. If a
  * non-HTMLElement key-value object argument is provided as the first parameter,
  * the method will use that value configuration object instead of the node and
- * run its operations on the entire doucment body.
+ * run its operations on the entire document body.
  * </p>
  * <h3>Rules</h3>
  * <hr />
@@ -140,17 +144,27 @@ Section508.unhookTabIndex = function(id) {
  * </p>
  * <p>
  * Not setting this options sets <code>rules</code> to its default value which
- * is <code>Section508.Rule.ALL</code> which will run all 508 rules on the given
- * <code>node</code> argument passed as the second parameter.
+ * is <code>Section508.Rule.All</code> which will run all 508 rules on the
+ * given <code>node</code> argument passed as the second parameter.
  * </p>
  * <h5>Example</h>
  * <p>
  * <div class="code">
  * 
  * <pre>
- * Section508.makeCompliant($('document.body'), {
- *     rules : Section508.Rule.A_BlankTarget + Section508.Rule.Button_MissingTabindex,
+ * <code class="comment">
+ * // Only enforce 508 compliance for a tags with a _blank target attribute
+ * // and buttons without a tabindex attribute.
+ * </code>
+ * Section508.makeCompliant($(document.body), {
+ *     rules : Section508.Rule.A_BlankTarget
+ *         + Section508.Rule.Button_MissingTabindex,
  * });
+ * <code class="comment">
+ * // Enforce all 508 rules on the entire document body and all of its nested
+ * // elements.
+ * </code>
+ * Section508.makeCompliant();
  * </pre>
  * 
  * </div>
@@ -164,13 +178,35 @@ Section508.unhookTabIndex = function(id) {
  * <code>rules</code> option) in the passed array on the given
  * <code>node</code> argument passed as the second parameter.
  * </p>
+ * <p>
+ * Passing <code>true</code> as the only parameter for this method will set
+ * the <code>debug</code> option to the default value of
+ * <code>Section508.Rule.All</code>.
+ * </p>
  * <h5>Example</h>
  * <p>
  * <div class="code">
  * 
  * <pre>
- * Section508.makeCompliant('document.body', {
- *     debug : Section508.Rule.A_BlankTarget + Section508.Rule.Button_MissingTabindex,
+ * <code class="comment">
+ * // Only display debugging messages in the console for a tags with a _blank  
+ * // target attribute and buttons without a tabindex attribute.
+ * </code>
+ * Section508.makeCompliant(document.body, {
+ *     debug : Section508.Rule.A_BlankTarget
+ *         + Section508.Rule.Button_MissingTabindex,
+ * });
+ * <code class="comment">
+ * // Display all debug messages. All four method calls below do exactly the 
+ * // same thing.
+ * </code>
+ * Section508.makeCompliant(document.body, true);
+ * Section508.makeCompliant(true);
+ * Section508.makeCompliant(document.body, {
+ *     debug : Section508.Rule.All,
+ * });
+ * Section508.makeCompliant({
+ *     debug : Section508.Rule.All,
  * });
  * </pre>
  * 
@@ -179,21 +215,22 @@ Section508.unhookTabIndex = function(id) {
  * <h4>jQuery</h4>
  * <hr />
  * <p>
- * <code>Section508</code> can also be used in combinations with jQuery like in
- * the following example.
+ * <code>Section508</code> can also be used in combinations with jQuery like
+ * in the following example.
  * </p>
  * <h5>Example</h5>
  * <div class="code">
  * 
  * <pre>
- * $('document.body').make508Compliant();
- * $('document.body').make508Compliant({
+ * $(document.body).make508Compliant();
+ * $(document.body).make508Compliant({
  *     rules : Section508.Rule.Button_MissingTabindex,
  *     debug : Section508.Rule.All,
  * });
  * </pre>
  * 
- * </div> <style> .code { background: #f8f8f8; padding: 10px; } </style>
+ * </div> <style> .code { background: #f8f8f8; padding: 10px; } .code .comment {
+ * color: green; } </style>
  * 
  * @param {mixed} node A DOM Node or string id.
  * @param {object} config Key-value configuration object.
@@ -207,17 +244,24 @@ Section508.makeCompliant =
         var loggedViolations = [];
         var failedViolations = []
 
-        if (!($(node)[0] instanceof HTMLElement)) {
-            config = node, node = null;
+        if (node != null && !($(node)[0] instanceof HTMLElement)) {
+            if (node === true) {
+                config.debug = Section508.Rule.All;
+            } else {
+                config = node, node = null;
+            }
         }
 
         if (config.rules == null) config.rules = Section508.Rule.All;
-        if (config.debug == null) config.debug = 0;
+
+        if (config.debug === true) config.debug = Section508.Rule.All;
+        else if (config.debug == null) config.debug = 0;
 
         function log(rule, message, node, fixed) {
+            var violation = new Section508Violation(rule, message, node, fixed);
+            violations.push(violation);
             if (config.debug & rule) {
-                loggedViolations.push(new Section508Violation(rule, message, node,
-                    fixed));
+                loggedViolations.push(violation);
                 console.log(loggedViolations.length + '. ' + message, node);
             }
         }
@@ -237,9 +281,24 @@ Section508.makeCompliant =
                     }));
                 }
                 var message = Section508.Message.A_BlankTarget;
-                violations.push(new Section508Violation(Section508.Rule.A_BlankTarget,
-                    message, this, true));
                 log(Section508.Rule.A_BlankTarget, message, this, true);
+            });
+        }
+
+        if (config.rules & Section508.Rule.A_WindowTarget) {
+            // Add title attribute to all a tags the open a new window.
+            var targets = $('a[onclick^="window.open"]');
+            targets.each(function(i, e) {
+                var next = $(this).next();
+                if (next.attr('class') == null
+                    || next.attr('class').indexOf('sr-only') < 0) {
+                    $(this).after($.build('span', {
+                        html : '(link opens in a new window)',
+                        className : 'sr-only',
+                    }));
+                }
+                var message = Section508.Message.A_WindowTarget;
+                log(Section508.Rule.A_WindowTarget, message, this, true);
             });
         }
 
@@ -248,11 +307,7 @@ Section508.makeCompliant =
             var targets = $('a:not([tabindex])');
             targets.each(function(i, e) {
                 $(this).attr('tabindex', '0');
-                violations.push(new Section508Violation(
-                    Section508.Rule.A_MissingTabindex));
                 var message = Section508.Message.A_MissingTabindex;
-                violations.push(new Section508Violation(
-                    Section508.Rule.A_MissingTabindex, message, this, true));
                 log(Section508.Rule.A_MissingTabindex, message, this, true);
             });
         }
@@ -261,27 +316,29 @@ Section508.makeCompliant =
             // Add title attribute to all a elements without one.
             var targets = $('a:not([title])');
             targets.each(function(i, e) {
+
                 var title, message, fixed = true;
-                title = $(this).html().innerMostHTML();
+                title =
+                    $(this).html().replace(/<.*?>/g, '').replace(/\s\s+/g, ' ')
+                        .replace(/&amp;/g, '&');
                 if (!title || title.trim() == '') title = $(this).attr('id');
                 if (!title || title.trim() == '') title = $(this).attr('name');
+                if (!title || title.trim() == '') title = $(this).attr('href');
                 if (!title || title.trim() == '') {
                     fixed = false;
                     title = 'Anonymous hyperlink';
                     message =
-                        Section508.Message.WARNING_A_MissingTitle.format(title);
+                        Section508.Message.WARNING_A_MissingTitle.replace(/%s/,
+                            title);
                     failedViolations.push(new Section508Violation(
                         Section508.Rule.A_MissingTitle, message, this, fixed))
                 } else {
                     message =
-                        'Setting missing title as "' + title.trim()
-                            + '" for hyperlink :: %O';
+                        Section508.Message.A_MissingTitle.replace(/%s/, title);
                 }
 
                 $(this).attr('title', title);
 
-                violations.push(new Section508Violation(Section508.Rule.A_MissingTitle,
-                    message, this, fixed));
                 log(Section508.Rule.A_MissingTitle, message, this, fixed);
 
             });
@@ -290,13 +347,13 @@ Section508.makeCompliant =
         if (config.rules & Section508.Rule.Button_MissingTabindex) {
             // Add a tabindex of 0 to any button element without one.
             var targets = $('button:not([tabindex])');
-            targets.each(function(i, e) {
-                $(this).attr('tabindex', '0');
-                var message = 'Setting missing tabindex as 0 for button :: %O';
-                violations.push(new Section508Violation(
-                    Section508.Rule.Button_MissingTabindex, message, this, true));
-                log(Section508.Rule.Button_MissingTabindex, message, this, true);
-            });
+            targets
+                .each(function(i, e) {
+                    $(this).attr('tabindex', '0');
+                    var message = Section508.Message.Button_MissingTabindex;
+                    log(Section508.Rule.Button_MissingTabindex, message, this,
+                        true);
+                });
         }
 
         if (config.rules & Section508.Rule.Button_MissingTitle) {
@@ -304,15 +361,16 @@ Section508.makeCompliant =
             var targets = $('button:not([title])');
             targets
                 .each(function(i, e) {
-                    var title = $(this).html().innerMostHTML().trim();
+                    var title =
+                        $(this).html().replace(/<.*?>/g, '').replace(/\s\s+/g,
+                            ' ').replace(/&amp;/g, '&').trim();
                     if (!title || title.trim() == '') return;
                     $(this).attr('title', title);
                     var message =
-                        'Setting missing title as "' + title
-                            + '" for button :: %O';
-                    violations.push(new Section508Violation(
-                        Section508.Rule.Button_MissingTitle, message, this, true));
-                    log(Section508.Rule.Button_MissingTitle, message, this, true);
+                        Section508.Message.Button_MissingTitle.replace(/%s/,
+                            title);
+                    log(Section508.Rule.Button_MissingTitle, message, this,
+                        true);
                 });
         }
 
@@ -323,10 +381,20 @@ Section508.makeCompliant =
                 var title = $(this).attr('data-original-title');
                 $(this).attr('title', title);
                 var message =
-                    'Restoring title as "' + title + '" for data-toggle :: %O';
-                violations.push(new Section508Violation(
-                    Section508.Rule.DataToggle_RestoreTitle, message, this, true));
-                log(Section508.Rule.DataToggle_RestoreTitle, message, this, true);
+                    Section508.Message.DataToggle_RestoreTitle.replace(/%s/,
+                        title);
+                log(Section508.Rule.DataToggle_RestoreTitle, message, this,
+                    true);
+            });
+        }
+
+        if (config.rules & Section508.Rule.Img_MissingTabindex) {
+            // Add a tabindex of 0 to any button element without one.
+            var targets = $('img:not([tabindex])');
+            targets.each(function(i, e) {
+                $(this).attr('tabindex', '0');
+                var message = Section508.Message.Img_MissingTabindex;
+                log(Section508.Rule.Img_MissingTabindex, message, this, true);
             });
         }
 
@@ -336,9 +404,8 @@ Section508.makeCompliant =
             targets.each(function(i, e) {
                 $(this).attr('scope', 'rowgroup');
                 var message =
-                    'Setting scope as "rowgroup" for table data-cell :: %O';
-                violations.push(new Section508Violation(
-                    Section508.Rule.TD_MissingScope, message, this, true));
+                    Section508.Message.TD_MissingScope
+                        .replace(/%s/, 'rowgroup');
                 log(Section508.Rule.TD_MissingScope, message, this, true);
             });
         }
@@ -349,9 +416,8 @@ Section508.makeCompliant =
             targets.each(function(i, e) {
                 $(this).attr('scope', 'colgroup');
                 var message =
-                    'Setting scope as "colgroup" for table header :: %O';
-                violations.push(new Section508Violation(
-                    Section508.Rule.TH_MissingScope, message, this, true));
+                    Section508.Message.TH_MissingScope
+                        .replace(/%s/, 'colgroup');
                 log(Section508.Rule.TH_MissingScope, message, this, true);
             });
         }
@@ -381,5 +447,7 @@ Section508.makeCompliant =
  * @param {object} config
  */
 $.fn.make508Compliant = function(config) {
-    Section508.makeCompliant(this, config);
+    Section508.makeCompliant(this, config + {
+        addBack : true
+    });
 }
