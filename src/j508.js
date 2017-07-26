@@ -45,6 +45,7 @@ $.enumerate('Section508.Rule', {
     Button_MissingTabindex : null,//
     Button_MissingTitle : null, //
     DataToggle_RestoreTitle : null, //
+    DatePicker_AddFix : null,
     Img_MissingTabindex : null,
     TD_MissingScope : null, //
     TH_MissingScope : null, //
@@ -64,6 +65,7 @@ Section508.Message =
         Button_MissingTabindex : 'Adding missing tabindex as 0 for hyperlink :: %O',
         Button_MissingTitle : 'Adding missing title attribute as "%s" for button :: %O',
         DataToggle_RestoreTitle : 'Restoring title as "%s" for data-toggle :: %O',
+        DatePicker_AddFix : 'Making DatePicker 508 compliant :: %O',
         Img_MissingTabindex : 'Adding missing tabindex as 0 for image :: %O',
         TD_MissingScope : 'Adding missing scope attribute as "%s" for table data-cell :: %O',
         TH_MissingScope : 'Adding missing scope attribute as "%s" for table data-cell :: %O',
@@ -71,55 +73,6 @@ Section508.Message =
         WARNING_A_MissingTitle : 'WARNING: Unable to find an appropriate title for anonymous hyperlink. The title "%s" was used instead.',
 
     };
-
-/**
- * Map that points a set of unique ids to the DOM elements that have the event
- * listener hooked to them
- */
-Section508.hooks = {};
-
-/**
- * Hooks the tab key to be confined only elements inside of a given
- * {@code element}.
- * 
- * @param {string} id - Id of this event listener which can be used to "unhook"
- *            it in the future.
- * @param {Element} element - Element in which to confine the tab index to.
- * @returns {void}
- */
-Section508.hookTabIndex = function(id, element) {
-    var elements = $(element).find(':enabled').sort(function(a, b) {
-        return a.className < b.className;
-    });
-    if (elements.length < 1) { return; }
-    this.hooks['keydown.Section508.tab.' + id] = elements.last();
-    elements[0].focus();
-    elements.last().bind('keydown.Section508.tab.' + id, function(e) {
-        e = (e || window.event);
-        var keyCode = (typeof e.which == 'number') ? e.which : e.keyCode;
-        if (keyCode === 9) {
-            e.preventDefault();
-            var elements = $(element).find(':enabled').sort(function(a, b) {
-                return a.className < b.className;
-            })
-            if (elements.length < 0) { return; }
-            elements.first().focus();
-        }
-    });
-}
-
-/**
- * Unhooks the keypress event listener associated with {@code id}.
- * 
- * @param {string} id - Id of the event listener to unhook.
- * @returns {void}
- */
-Section508.unhookTabIndex = function(id) {
-    if (element = this.hooks['keydown.Section508.tab.' + id]) {
-        $(element).off('keydown.Section508.tab.' + id);
-    }
-    delete this.hooks['keydown.Section508.tab.' + id];
-}
 
 /**
  * <p>
@@ -132,7 +85,7 @@ Section508.unhookTabIndex = function(id) {
  * The second parameter is a standard key-value configuration object. If a
  * non-HTMLElement key-value object argument is provided as the first parameter,
  * the method will use that value configuration object instead of the node and
- * run its operations on the entire document body.
+ * run its operations on the entire doucment body.
  * </p>
  * <h3>Rules</h3>
  * <hr />
@@ -156,7 +109,7 @@ Section508.unhookTabIndex = function(id) {
  * // Only enforce 508 compliance for a tags with a _blank target attribute
  * // and buttons without a tabindex attribute.
  * </code>
- * Section508.makeCompliant($(document.body), {
+ * Section508.makeCompliant($('document.body'), {
  *     rules : Section508.Rule.A_BlankTarget
  *         + Section508.Rule.Button_MissingTabindex,
  * });
@@ -192,7 +145,7 @@ Section508.unhookTabIndex = function(id) {
  * // Only display debugging messages in the console for a tags with a _blank  
  * // target attribute and buttons without a tabindex attribute.
  * </code>
- * Section508.makeCompliant(document.body, {
+ * Section508.makeCompliant('document.body', {
  *     debug : Section508.Rule.A_BlankTarget
  *         + Section508.Rule.Button_MissingTabindex,
  * });
@@ -200,9 +153,9 @@ Section508.unhookTabIndex = function(id) {
  * // Display all debug messages. All four method calls below do exactly the 
  * // same thing.
  * </code>
- * Section508.makeCompliant(document.body, true);
+ * Section508.makeCompliant('document.body', true);
  * Section508.makeCompliant(true);
- * Section508.makeCompliant(document.body, {
+ * Section508.makeCompliant('document.body', {
  *     debug : Section508.Rule.All,
  * });
  * Section508.makeCompliant({
@@ -222,8 +175,8 @@ Section508.unhookTabIndex = function(id) {
  * <div class="code">
  * 
  * <pre>
- * $(document.body).make508Compliant();
- * $(document.body).make508Compliant({
+ * $('document.body').make508Compliant();
+ * $('document.body').make508Compliant({
  *     rules : Section508.Rule.Button_MissingTabindex,
  *     debug : Section508.Rule.All,
  * });
@@ -238,7 +191,8 @@ Section508.unhookTabIndex = function(id) {
 Section508.makeCompliant =
     function(node, config) {
 
-        if (config == null) config = {};
+        if (config == null)
+            config = {};
 
         var violations = [];
         var loggedViolations = [];
@@ -252,10 +206,14 @@ Section508.makeCompliant =
             }
         }
 
-        if (config.rules == null) config.rules = Section508.Rule.All;
+        if (config.rules == null)
+            config.rules = Section508.Rule.All;
 
-        if (config.debug === true) config.debug = Section508.Rule.All;
-        else if (config.debug == null) config.debug = 0;
+        if (config.debug === true)
+            config.debug = Section508.Rule.All;
+        else
+            if (config.debug == null)
+                config.debug = 0;
 
         function log(rule, message, node, fixed) {
             var violation = new Section508Violation(rule, message, node, fixed);
@@ -315,33 +273,39 @@ Section508.makeCompliant =
         if (config.rules & Section508.Rule.A_MissingTitle) {
             // Add title attribute to all a elements without one.
             var targets = $('a:not([title])');
-            targets.each(function(i, e) {
+            targets
+                .each(function(i, e) {
 
-                var title, message, fixed = true;
-                title =
-                    $(this).html().replace(/<.*?>/g, '').replace(/\s\s+/g, ' ')
-                        .replace(/&amp;/g, '&');
-                if (!title || title.trim() == '') title = $(this).attr('id');
-                if (!title || title.trim() == '') title = $(this).attr('name');
-                if (!title || title.trim() == '') title = $(this).attr('href');
-                if (!title || title.trim() == '') {
-                    fixed = false;
-                    title = 'Anonymous hyperlink';
-                    message =
-                        Section508.Message.WARNING_A_MissingTitle.replace(/%s/,
-                            title);
-                    failedViolations.push(new Section508Violation(
-                        Section508.Rule.A_MissingTitle, message, this, fixed))
-                } else {
-                    message =
-                        Section508.Message.A_MissingTitle.replace(/%s/, title);
-                }
+                    var title, message, fixed = true;
+                    title =
+                        $(this).html().replace(/<.*?>/g, '').replace(/\s\s+/g,
+                            ' ');
+                    if (!title || title.trim() == '')
+                        title = $(this).attr('id');
+                    if (!title || title.trim() == '')
+                        title = $(this).attr('name');
+                    if (!title || title.trim() == '')
+                        title = $(this).attr('href');
+                    if (!title || title.trim() == '') {
+                        fixed = false;
+                        title = 'Anonymous hyperlink';
+                        message =
+                            Section508.Message.WARNING_A_MissingTitle.replace(
+                                /%s/, title);
+                        failedViolations.push(new Section508Violation(
+                            Section508.Rule.A_MissingTitle, message, this,
+                            fixed))
+                    } else {
+                        message =
+                            Section508.Message.A_MissingTitle.replace(/%s/,
+                                title);
+                    }
 
-                $(this).attr('title', title);
+                    $(this).attr('title', title);
 
-                log(Section508.Rule.A_MissingTitle, message, this, fixed);
+                    log(Section508.Rule.A_MissingTitle, message, this, fixed);
 
-            });
+                });
         }
 
         if (config.rules & Section508.Rule.Button_MissingTabindex) {
@@ -363,8 +327,9 @@ Section508.makeCompliant =
                 .each(function(i, e) {
                     var title =
                         $(this).html().replace(/<.*?>/g, '').replace(/\s\s+/g,
-                            ' ').replace(/&amp;/g, '&').trim();
-                    if (!title || title.trim() == '') return;
+                            ' ').trim();
+                    if (!title || title.trim() == '')
+                        return;
                     $(this).attr('title', title);
                     var message =
                         Section508.Message.Button_MissingTitle.replace(/%s/,
@@ -385,6 +350,31 @@ Section508.makeCompliant =
                         title);
                 log(Section508.Rule.DataToggle_RestoreTitle, message, this,
                     true);
+            });
+        }
+
+        if (config.rules & Section508.Rule.DatePicker_AddFix) {
+            // Make DatePickers 508 compliant
+            var targets =
+                $('.TimeSlotTable, .TimeSlotTable .TimeSlot.available a.timeSlotLinkContent');
+            targets.each(function(i, e) {
+                $(this).off('keyup.Section508');
+                $(this).bind(
+                    'keyup.Section508',
+                    function(e) {
+                        var keyCode = e.which || e.keyCode;
+                        switch (keyCode) {
+
+                        case 13:
+                            e.preventDefault();
+                            var focusTarget =
+                                $(this).closest('.dataTables_wrapper').parent()
+                                    .next();
+                            focusTarget.focus();
+                            break;
+
+                        }
+                    });
             });
         }
 
@@ -437,6 +427,59 @@ Section508.makeCompliant =
 
     }
 
+/**
+ * Map that points a set of unique ids to the DOM elements that have the event
+ * listener hooked to them
+ */
+Section508.hooks = {};
+
+/**
+ * Hooks the tab key to be confined only elements inside of a given
+ * {@code element}.
+ * 
+ * @param {string} id - Id of this event listener which can be used to "unhook"
+ *            it in the future.
+ * @param {Element} element - Element in which to confine the tab index to.
+ * @returns {void}
+ */
+Section508.hookTabIndex = function(id, element) {
+    var elements = $(element).find(':enabled').sort(function(a, b) {
+        return a.className < b.className;
+    });
+    if (elements.length < 1) {
+        return;
+    }
+    this.hooks['keydown.Section508.tab.' + id] = elements.last();
+    elements[0].focus();
+    elements.last().bind('keydown.Section508.tab.' + id, function(e) {
+        e = (e || window.event);
+        var keyCode = (typeof e.which == 'number') ? e.which : e.keyCode;
+        if (keyCode === 9) {
+            e.preventDefault();
+            var elements = $(element).find(':enabled').sort(function(a, b) {
+                return a.className < b.className;
+            })
+            if (elements.length < 0) {
+                return;
+            }
+            elements.first().focus();
+        }
+    });
+}
+
+/**
+ * Unhooks the keypress event listener associated with {@code id}.
+ * 
+ * @param {string} id - Id of the event listener to unhook.
+ * @returns {void}
+ */
+Section508.unhookTabIndex = function(id) {
+    if (element = this.hooks['keydown.Section508.tab.' + id]) {
+        $(element).off('keydown.Section508.tab.' + id);
+    }
+    delete this.hooks['keydown.Section508.tab.' + id];
+}
+
 /*******************************************************************************
  * jQuery Extensions
  ******************************************************************************/
@@ -447,7 +490,19 @@ Section508.makeCompliant =
  * @param {object} config
  */
 $.fn.make508Compliant = function(config) {
-    Section508.makeCompliant(this, config + {
-        addBack : true
-    });
+    Section508.makeCompliant(this, config);
+}
+
+/**
+ * 
+ */
+$.fn.hookTabIndex = function(id) {
+    Section508.hookTabIndex(id, this);
+}
+
+/**
+ * 
+ */
+$.fn.unhookTabIndex = function(id) {
+    Section508.unhookTabIndex(id, this);
 }
