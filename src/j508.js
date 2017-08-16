@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Section508.js
+ * j508.js
  ******************************************************************************/
 
 /*******************************************************************************
@@ -7,21 +7,32 @@
  ******************************************************************************/
 
 /**
- * @returns {Section508}
+ * <p>
+ * <code>j508</code> is currently not an instantiable API prototype. All of
+ * its methods are static with <code>j508.makeCompliant</code> as the primary
+ * method used, and a custom jQuery alias method
+ * <code>$.fn.make508Compliant</code>.
+ * </p>
+ * 
+ * @returns {j508}
  */
-function Section508() {
-
+function j508() {
 }
 
 /**
+ * <p>
+ * A simple data structure used to represent Section 508 violations encountered
+ * when the j508 API attempts to clean up a DOM element.
+ * </p>
+ * 
  * @param {integer} code
  * @param {string} message
  * @param {mixed} context
  * @param {boolean} fixed
  * @param {string} comments
- * @returns {Section508Violation}
+ * @returns {j508Violation}
  */
-function Section508Violation(code, message, context, fixed, comments) {
+function j508Violation(code, message, context, fixed, comments) {
     this.code = code != null ? code : 'No violation code.';
     this.message = message != null ? message : 'No violation message';
     this.context = context != null ? context : 'No violation context.';
@@ -34,18 +45,19 @@ function Section508Violation(code, message, context, fixed, comments) {
  ******************************************************************************/
 
 /**
- * Enumerated bitmask used to specify which rules to either run or output to the
- * console. Mainly for debug purposes.
+ * Enumerated bitmask generated at runtime used to specify which rules to either
+ * run or output to the console. Mainly for debug purposes.
  */
-$.enumerate('Section508.Rule', {
+$.enumerate('j508.Rule', {
     A_BlankTarget : null, //
     A_MissingTabindex : null, //
     A_MissingTitle : null, //
-    A_WindowTarget : null,
     Button_MissingTabindex : null,//
     Button_MissingTitle : null, //
     DataToggle_RestoreTitle : null, //
     DatePicker_AddFix : null,
+    DisabledInput_RemoveTabindex : null,
+    DropDown_AddFix : null,
     Img_MissingTabindex : null,
     TD_MissingScope : null, //
     TH_MissingScope : null, //
@@ -53,19 +65,20 @@ $.enumerate('Section508.Rule', {
 }, true);
 
 /**
- * String constants used by the Section508 API.
+ * String constants used by the j508 API.
  */
-Section508.Message =
+j508.Message =
     {
 
         A_BlankTarget : 'Inserting missing sr-only element after blank target hyperlink. :: %O',
         A_MissingTabindex : 'Adding missing tabindex attribute as 0 for hyperlink :: %O',
         A_MissingTitle : 'Adding missing title attribute as "%s" for hyperlink :: %O',
-        A_WindowTarget : 'Inserting missing sr-only element after window target hyperlink. :: %O',
         Button_MissingTabindex : 'Adding missing tabindex as 0 for hyperlink :: %O',
         Button_MissingTitle : 'Adding missing title attribute as "%s" for button :: %O',
         DataToggle_RestoreTitle : 'Restoring title as "%s" for data-toggle :: %O',
         DatePicker_AddFix : 'Making DatePicker 508 compliant :: %O',
+        DisabledInput_RemoveTabindex : 'Setting tabindex attribute to %s for disabled input :: %O',
+        DropDown_AddFix : 'Making DropDown menu visible when overflow :: %O',
         Img_MissingTabindex : 'Adding missing tabindex as 0 for image :: %O',
         TD_MissingScope : 'Adding missing scope attribute as "%s" for table data-cell :: %O',
         TH_MissingScope : 'Adding missing scope attribute as "%s" for table data-cell :: %O',
@@ -73,6 +86,10 @@ Section508.Message =
         WARNING_A_MissingTitle : 'WARNING: Unable to find an appropriate title for anonymous hyperlink. The title "%s" was used instead.',
 
     };
+
+j508.Data = {
+    ActiveDropDowns : [],
+}
 
 /**
  * <p>
@@ -97,8 +114,8 @@ Section508.Message =
  * </p>
  * <p>
  * Not setting this options sets <code>rules</code> to its default value which
- * is <code>Section508.Rule.All</code> which will run all 508 rules on the
- * given <code>node</code> argument passed as the second parameter.
+ * is <code>j508.Rule.All</code> which will run all 508 rules on the given
+ * <code>node</code> argument passed as the second parameter.
  * </p>
  * <h5>Example</h>
  * <p>
@@ -109,15 +126,14 @@ Section508.Message =
  * // Only enforce 508 compliance for a tags with a _blank target attribute
  * // and buttons without a tabindex attribute.
  * </code>
- * Section508.makeCompliant($('document.body'), {
- *     rules : Section508.Rule.A_BlankTarget
- *         + Section508.Rule.Button_MissingTabindex,
+ * j508.makeCompliant($('document.body'), {
+ *     rules : j508.Rule.A_BlankTarget + j508.Rule.Button_MissingTabindex,
  * });
  * <code class="comment">
  * // Enforce all 508 rules on the entire document body and all of its nested
  * // elements.
  * </code>
- * Section508.makeCompliant();
+ * j508.makeCompliant();
  * </pre>
  * 
  * </div>
@@ -134,7 +150,7 @@ Section508.Message =
  * <p>
  * Passing <code>true</code> as the only parameter for this method will set
  * the <code>debug</code> option to the default value of
- * <code>Section508.Rule.All</code>.
+ * <code>j508.Rule.All</code>.
  * </p>
  * <h5>Example</h>
  * <p>
@@ -145,21 +161,20 @@ Section508.Message =
  * // Only display debugging messages in the console for a tags with a _blank  
  * // target attribute and buttons without a tabindex attribute.
  * </code>
- * Section508.makeCompliant('document.body', {
- *     debug : Section508.Rule.A_BlankTarget
- *         + Section508.Rule.Button_MissingTabindex,
+ * j508.makeCompliant(document.body, {
+ *     debug : j508.Rule.A_BlankTarget + j508.Rule.Button_MissingTabindex,
  * });
  * <code class="comment">
  * // Display all debug messages. All four method calls below do exactly the 
  * // same thing.
  * </code>
- * Section508.makeCompliant('document.body', true);
- * Section508.makeCompliant(true);
- * Section508.makeCompliant('document.body', {
- *     debug : Section508.Rule.All,
+ * j508.makeCompliant('document.body', true);
+ * j508.makeCompliant(true);
+ * j508.makeCompliant(document.body, {
+ *     debug : j508.Rule.All,
  * });
- * Section508.makeCompliant({
- *     debug : Section508.Rule.All,
+ * j508.makeCompliant({
+ *     debug : j508.Rule.All,
  * });
  * </pre>
  * 
@@ -168,17 +183,17 @@ Section508.Message =
  * <h4>jQuery</h4>
  * <hr />
  * <p>
- * <code>Section508</code> can also be used in combinations with jQuery like
- * in the following example.
+ * <code>j508</code> can also be used in combinations with jQuery like in the
+ * following example.
  * </p>
  * <h5>Example</h5>
  * <div class="code">
  * 
  * <pre>
- * $('document.body').make508Compliant();
- * $('document.body').make508Compliant({
- *     rules : Section508.Rule.Button_MissingTabindex,
- *     debug : Section508.Rule.All,
+ * $(document.body).make508Compliant();
+ * $(document.body).make508Compliant({
+ *     rules : j508.Rule.Button_MissingTabindex,
+ *     debug : j508.Rule.All,
  * });
  * </pre>
  * 
@@ -186,39 +201,47 @@ Section508.Message =
  * color: green; } </style>
  * 
  * @param {mixed} node A DOM Node or string id.
- * @param {object} config Key-value configuration object.
+ * @param {mixed} opts Key-value configuration object.
  */
-Section508.makeCompliant =
-    function(node, config) {
+j508.makeCompliant =
+    function(node, opts) {
 
-        if (config == null)
-            config = {};
+        if (opts == null) opts = {};
+        if (typeof opts == 'number') opts = {
+            debug : opts,
+        };
 
         var violations = [];
         var loggedViolations = [];
         var failedViolations = []
 
         if (node != null && !($(node)[0] instanceof HTMLElement)) {
-            if (node === true) {
-                config.debug = Section508.Rule.All;
-            } else {
-                config = node, node = null;
+            switch (typeof node) {
+
+            case 'boolean':
+                opts.debug = j508.Rule.All;
+                break;
+
+            case 'number':
+                opts.rules = node;
+                break;
+
+            case 'object':
+            default:
+                opts = node, node = null;
+                break;
             }
         }
 
-        if (config.rules == null)
-            config.rules = Section508.Rule.All;
+        if (opts.rules == null) opts.rules = j508.Rule.All;
 
-        if (config.debug === true)
-            config.debug = Section508.Rule.All;
-        else
-            if (config.debug == null)
-                config.debug = 0;
+        if (opts.debug === true) opts.debug = j508.Rule.All;
+        else if (opts.debug == null) opts.debug = 0;
 
         function log(rule, message, node, fixed) {
-            var violation = new Section508Violation(rule, message, node, fixed);
+            var violation = new j508Violation(rule, message, node, fixed);
             violations.push(violation);
-            if (config.debug & rule) {
+            if (opts.debug & rule) {
                 loggedViolations.push(violation);
                 console.log(loggedViolations.length + '. ' + message, node);
             }
@@ -226,53 +249,37 @@ Section508.makeCompliant =
 
         var target = node != null ? $(node) : $(document.body);
 
-        if (config.rules & Section508.Rule.A_BlankTarget) {
+        if (opts.rules & j508.Rule.A_BlankTarget) {
             // Add title attribute to all a tags the open a new window.
-            var targets = $('a[target=_blank]');
+            var targets =
+                target.find('a[target=_blank],a[onclick*="window.open"]');
             targets.each(function(i, e) {
                 var next = $(this).next();
-                if (next.attr('class') == null
-                    || next.attr('class').indexOf('sr-only') < 0) {
+                if (next.attr('class') == null ||
+                    next.attr('class').indexOf('sr-only') < 0) {
                     $(this).after($.build('span', {
                         html : '(link opens in a new tab)',
                         className : 'sr-only',
                     }));
                 }
-                var message = Section508.Message.A_BlankTarget;
-                log(Section508.Rule.A_BlankTarget, message, this, true);
+                var message = j508.Message.A_BlankTarget;
+                log(j508.Rule.A_BlankTarget, message, this, true);
             });
         }
 
-        if (config.rules & Section508.Rule.A_WindowTarget) {
-            // Add title attribute to all a tags the open a new window.
-            var targets = $('a[onclick^="window.open"]');
-            targets.each(function(i, e) {
-                var next = $(this).next();
-                if (next.attr('class') == null
-                    || next.attr('class').indexOf('sr-only') < 0) {
-                    $(this).after($.build('span', {
-                        html : '(link opens in a new window)',
-                        className : 'sr-only',
-                    }));
-                }
-                var message = Section508.Message.A_WindowTarget;
-                log(Section508.Rule.A_WindowTarget, message, this, true);
-            });
-        }
-
-        if (config.rules & Section508.Rule.A_MissingTabindex) {
+        if (opts.rules & j508.Rule.A_MissingTabindex) {
             // Add a tabindex of 0 to any a element without one.
-            var targets = $('a:not([tabindex])');
+            var targets = target.find('a:not([tabindex])');
             targets.each(function(i, e) {
                 $(this).attr('tabindex', '0');
-                var message = Section508.Message.A_MissingTabindex;
-                log(Section508.Rule.A_MissingTabindex, message, this, true);
+                var message = j508.Message.A_MissingTabindex;
+                log(j508.Rule.A_MissingTabindex, message, this, true);
             });
         }
 
-        if (config.rules & Section508.Rule.A_MissingTitle) {
+        if (opts.rules & j508.Rule.A_MissingTitle) {
             // Add title attribute to all a elements without one.
-            var targets = $('a:not([title])');
+            var targets = target.find('a:not([title])');
             targets
                 .each(function(i, e) {
 
@@ -280,139 +287,221 @@ Section508.makeCompliant =
                     title =
                         $(this).html().replace(/<.*?>/g, '').replace(/\s\s+/g,
                             ' ');
-                    if (!title || title.trim() == '')
-                        title = $(this).attr('id');
-                    if (!title || title.trim() == '')
-                        title = $(this).attr('name');
-                    if (!title || title.trim() == '')
-                        title = $(this).attr('href');
+                    if (!title || title.trim() == '') title =
+                        $(this).attr('id');
+                    if (!title || title.trim() == '') title =
+                        $(this).attr('name');
+                    if (!title || title.trim() == '') title =
+                        $(this).attr('href');
                     if (!title || title.trim() == '') {
                         fixed = false;
                         title = 'Anonymous hyperlink';
                         message =
-                            Section508.Message.WARNING_A_MissingTitle.replace(
-                                /%s/, title);
-                        failedViolations.push(new Section508Violation(
-                            Section508.Rule.A_MissingTitle, message, this,
-                            fixed))
+                            j508.Message.WARNING_A_MissingTitle.replace(/%s/,
+                                title);
+                        failedViolations.push(new j508Violation(
+                            j508.Rule.A_MissingTitle, message, this, fixed))
                     } else {
                         message =
-                            Section508.Message.A_MissingTitle.replace(/%s/,
-                                title);
+                            j508.Message.A_MissingTitle.replace(/%s/, title);
                     }
 
                     $(this).attr('title', title);
 
-                    log(Section508.Rule.A_MissingTitle, message, this, fixed);
+                    log(j508.Rule.A_MissingTitle, message, this, fixed);
 
                 });
         }
 
-        if (config.rules & Section508.Rule.Button_MissingTabindex) {
+        if (opts.rules & j508.Rule.Button_MissingTabindex) {
             // Add a tabindex of 0 to any button element without one.
-            var targets = $('button:not([tabindex])');
-            targets
-                .each(function(i, e) {
-                    $(this).attr('tabindex', '0');
-                    var message = Section508.Message.Button_MissingTabindex;
-                    log(Section508.Rule.Button_MissingTabindex, message, this,
-                        true);
-                });
+            var targets = target.find('button:not([tabindex])');
+            targets.each(function(i, e) {
+                $(this).attr('tabindex', '0');
+                var message = j508.Message.Button_MissingTabindex;
+                log(j508.Rule.Button_MissingTabindex, message, this, true);
+            });
         }
 
-        if (config.rules & Section508.Rule.Button_MissingTitle) {
+        if (opts.rules & j508.Rule.Button_MissingTitle) {
             // Add title attribute to all a button elements without one.
-            var targets = $('button:not([title])');
-            targets
-                .each(function(i, e) {
-                    var title =
-                        $(this).html().replace(/<.*?>/g, '').replace(/\s\s+/g,
-                            ' ').trim();
-                    if (!title || title.trim() == '')
-                        return;
-                    $(this).attr('title', title);
-                    var message =
-                        Section508.Message.Button_MissingTitle.replace(/%s/,
-                            title);
-                    log(Section508.Rule.Button_MissingTitle, message, this,
-                        true);
-                });
+            var targets = target.find('button:not([title])');
+            targets.each(function(i, e) {
+                var title =
+                    $(this).html().replace(/<.*?>/g, '').replace(/\s\s+/g, ' ')
+                        .trim();
+                if (!title || title.trim() == '') return;
+                $(this).attr('title', title);
+                var message =
+                    j508.Message.Button_MissingTitle.replace(/%s/, title);
+                log(j508.Rule.Button_MissingTitle, message, this, true);
+            });
         }
 
-        if (config.rules & Section508.Rule.DataToggle_RestoreTitle) {
+        if (opts.rules & j508.Rule.DataToggle_RestoreTitle) {
             // Re-add title attributes removed by Bootstrap data-toggle API.
-            var targets = $('[data-original-title]');
+            var targets = target.find('[data-original-title]');
             targets.each(function(i, e) {
                 var title = $(this).attr('data-original-title');
                 $(this).attr('title', title);
                 var message =
-                    Section508.Message.DataToggle_RestoreTitle.replace(/%s/,
-                        title);
-                log(Section508.Rule.DataToggle_RestoreTitle, message, this,
-                    true);
+                    j508.Message.DataToggle_RestoreTitle.replace(/%s/, title);
+                log(j508.Rule.DataToggle_RestoreTitle, message, this, true);
             });
         }
 
-        if (config.rules & Section508.Rule.DatePicker_AddFix) {
+        if (opts.rules & j508.Rule.DatePicker_AddFix) {
             // Make DatePickers 508 compliant
             var targets =
-                $('.TimeSlotTable, .TimeSlotTable .TimeSlot.available a.timeSlotLinkContent');
+                target
+                    .find('.TimeSlotTable, .TimeSlotTable .TimeSlot.available a.timeSlotLinkContent');
             targets.each(function(i, e) {
-                $(this).off('keyup.Section508');
-                $(this).bind(
-                    'keyup.Section508',
+                $(this).off('keyup.j508');
+                $(this).on(
+                    'keyup.j508',
                     function(e) {
-                        var keyCode = e.which || e.keyCode;
-                        switch (keyCode) {
+                        switch ($(e).keyCode()) {
 
                         case 13:
                             e.preventDefault();
                             var focusTarget =
                                 $(this).closest('.dataTables_wrapper').parent()
                                     .next();
-                            focusTarget.focus();
+                            setTimeout(function() {
+                                focusTarget.focus();
+                            }, 10);
                             break;
 
                         }
                     });
             });
+            var message = j508.Message.DatePicker_AddFix;
+            log(j508.Rule.DatePicker_AddFix, message, this, true);
         }
 
-        if (config.rules & Section508.Rule.Img_MissingTabindex) {
+        if (opts.rules & j508.Rule.DisabledInput_RemoveTabindex) {
+            // Re-add title attributes removed by Bootstrap data-toggle API.
+            var targets = target.find('[disabled],[enabled=false]');
+            targets
+                .each(function(i, e) {
+                    $(this).attr('tabindex', '-1');
+                    var message =
+                        j508.Message.DisabledInput_RemoveTabindex.replace(/%s/,
+                            '-1');
+                    log(j508.Rule.DisabledInput_RemoveTabindex, message, this,
+                        true);
+                });
+        }
+
+        if (opts.rules & j508.Rule.DropDown_AddFix) {
+
+            // Add fixes to dropdown menus that are cut off by hidden overflow
+
+            var hideOpenDropDowns = function(e) {
+                $(j508.Data.ActiveDropDowns).each(function(i, e) {
+                    $(this).trigger('hide.bs.dropdown.j508');
+                });
+                j508.Data.ActiveDropDowns = [];
+            };
+
+            $('*').add(document).each(function(i, e) {
+                $(this).off('scroll.bs.dropdown.j508');
+                $(this).on('scroll.bs.dropdown.j508', hideOpenDropDowns);
+            });
+
+            $(window).off('resize.bs.dropdown.j508');
+            $(window).on('resize.bs.dropdown.j508', hideOpenDropDowns);
+
+            var targets = target.find('ul.dropdown-menu:not([class*=inline])');
+            targets.each(function(i, e) {
+
+                var parent = $(this).parent();
+
+                parent.off('show.bs.dropdown.j508');
+                parent.on('show.bs.dropdown.j508', function(e) {
+
+                    var dropdown =
+                        $(this).find('ul.dropdown-menu:not(.inline)').first();
+
+                    j508.Data.ActiveDropDowns.push(dropdown);
+
+                    var x =
+                        $(this).offset().left + dropdown.width() > $(window)
+                            .width() ? $(this).offset().left + $(this).width() -
+                            dropdown.width() : $(this).offset().left;
+                    if (x + dropdown.width() > $(window).width() - 50) {
+                        x = $(window).width() - dropdown.width() - 50;
+                    }
+
+                    var y = $(this).offset().top + $(this)[0].offsetHeight;
+                    dropdown.detach();
+                    $(document.body).append(dropdown.css({
+                        position : 'absolute',
+                        display : 'block',
+                        left : x,
+                        top : y,
+                    }));
+
+                    $(this).off('hide.bs.dropdown.j508');
+                    $(this).on('hide.bs.dropdown.j508', function(e) {
+                        dropdown.detach();
+                        parent.append(dropdown.css({
+                            position : 'absolute',
+                            display : 'none',
+                        }));
+                        j508.Data.ActiveDropDowns = [];
+                    });
+
+                });
+
+                parent.off('shown.bs.dropdown.j508');
+                parent.on('shown.bs.dropdown.j508', function(e) {
+                    setTimeout(function() {
+                        var dropdown = $(j508.Data.ActiveDropDowns[0]);
+                        dropdown.find('a').eq(0).focus();
+                    }, 10);
+                });
+
+                var message = j508.Message.DropDown_AddFix;
+                log(j508.Rule.DropDown_AddFix, message, this, true);
+
+            });
+
+        }
+
+        if (opts.rules & j508.Rule.Img_MissingTabindex) {
             // Add a tabindex of 0 to any button element without one.
-            var targets = $('img:not([tabindex])');
+            var targets = target.find('img:not([tabindex])');
             targets.each(function(i, e) {
                 $(this).attr('tabindex', '0');
-                var message = Section508.Message.Img_MissingTabindex;
-                log(Section508.Rule.Img_MissingTabindex, message, this, true);
+                var message = j508.Message.Img_MissingTabindex;
+                log(j508.Rule.Img_MissingTabindex, message, this, true);
             });
         }
 
-        if (config.rules & Section508.Rule.TD_MissingScope) {
+        if (opts.rules & j508.Rule.TD_MissingScope) {
             // Add scope attribute for all td elements without one.
-            var targets = $('tbody tr td:not([scope])');
+            var targets = target.find('tbody tr td:not([scope])');
             targets.each(function(i, e) {
                 $(this).attr('scope', 'rowgroup');
                 var message =
-                    Section508.Message.TD_MissingScope
-                        .replace(/%s/, 'rowgroup');
-                log(Section508.Rule.TD_MissingScope, message, this, true);
+                    j508.Message.TD_MissingScope.replace(/%s/, 'rowgroup');
+                log(j508.Rule.TD_MissingScope, message, this, true);
             });
         }
 
-        if (config.rules & Section508.Rule.TH_MissingScope) {
+        if (opts.rules & j508.Rule.TH_MissingScope) {
             // Add scope attribute to all td elements without one.
-            var targets = $('thead tr th:not([scope])');
+            var targets = target.find('thead tr th:not([scope])');
             targets.each(function(i, e) {
                 $(this).attr('scope', 'colgroup');
                 var message =
-                    Section508.Message.TH_MissingScope
-                        .replace(/%s/, 'colgroup');
-                log(Section508.Rule.TH_MissingScope, message, this, true);
+                    j508.Message.TH_MissingScope.replace(/%s/, 'colgroup');
+                log(j508.Rule.TH_MissingScope, message, this, true);
             });
         }
 
-        if (config.debug > 0) {
+        if (opts.debug > 0) {
             console
                 .log(
                     '%d Violations Logged. %d Total Violations Found. :: [Logged Violations %O] :: [All Violations %O]',
@@ -431,7 +520,7 @@ Section508.makeCompliant =
  * Map that points a set of unique ids to the DOM elements that have the event
  * listener hooked to them
  */
-Section508.hooks = {};
+j508.hooks = {};
 
 /**
  * Hooks the tab key to be confined only elements inside of a given
@@ -442,27 +531,25 @@ Section508.hooks = {};
  * @param {Element} element - Element in which to confine the tab index to.
  * @returns {void}
  */
-Section508.hookTabIndex = function(id, element) {
+j508.hookTabIndex = function(id, element) {
     var elements = $(element).find(':enabled').sort(function(a, b) {
         return a.className < b.className;
     });
-    if (elements.length < 1) {
-        return;
-    }
-    this.hooks['keydown.Section508.tab.' + id] = elements.last();
+    if (elements.length < 1) return;
+    this.hooks['keydown.j508.tab.' + id] = elements.last();
     elements[0].focus();
-    elements.last().bind('keydown.Section508.tab.' + id, function(e) {
-        e = (e || window.event);
-        var keyCode = (typeof e.which == 'number') ? e.which : e.keyCode;
-        if (keyCode === 9) {
+    $(elements.last()).on('keydown.j508.tab.' + id, function(e) {
+        switch ($(e).keyCode()) {
+        case 9:
             e.preventDefault();
             var elements = $(element).find(':enabled').sort(function(a, b) {
                 return a.className < b.className;
             })
-            if (elements.length < 0) {
-                return;
-            }
+            if (elements.length < 1) return;
             elements.first().focus();
+            break;
+        default:
+            break;
         }
     });
 }
@@ -473,11 +560,11 @@ Section508.hookTabIndex = function(id, element) {
  * @param {string} id - Id of the event listener to unhook.
  * @returns {void}
  */
-Section508.unhookTabIndex = function(id) {
-    if (element = this.hooks['keydown.Section508.tab.' + id]) {
-        $(element).off('keydown.Section508.tab.' + id);
+j508.unhookTabIndex = function(id) {
+    if (element = this.hooks['keydown.j508.tab.' + id]) {
+        $(element).off('keydown.j508.tab.' + id);
     }
-    delete this.hooks['keydown.Section508.tab.' + id];
+    delete this.hooks['keydown.j508.tab.' + id];
 }
 
 /*******************************************************************************
@@ -485,24 +572,414 @@ Section508.unhookTabIndex = function(id) {
  ******************************************************************************/
 
 /**
- * Short hand for <code>Section508.makeCompliant(this, config)</code>.
+ * <p>
+ * Alias for <a href="j508#makeCompliant"> <code>j508.makeCompliant</code></a>.
+ * </p>
  * 
- * @param {object} config
+ * @see j508#makeCompliant
+ * @param {object} opts
  */
-$.fn.make508Compliant = function(config) {
-    Section508.makeCompliant(this, config);
+$.fn.make508Compliant = function(opts) {
+    j508.makeCompliant(this, opts);
 }
 
 /**
- * 
+ * Alias for <code>j508.hookTabIndex(id, this)</code>.
  */
-$.fn.hookTabIndex = function(id) {
-    Section508.hookTabIndex(id, this);
+$.fn.hook508TabIndex = function(id) {
+    j508.hookTabIndex(id, this);
 }
 
 /**
- * 
+ * Alias for <code>j508.unhookTabIndex(id)</code>.
  */
-$.fn.unhookTabIndex = function(id) {
-    Section508.unhookTabIndex(id, this);
+$.unhook508TabIndex = function(id) {
+    j508.unhookTabIndex(id, this);
 }
+
+/*******************************************************************************
+ * jquery-extensions.js
+ ******************************************************************************/
+
+/*******************************************************************************
+ * jQuery Static Functions
+ ******************************************************************************/
+
+/**
+ * <p>
+ * Creates a new document element from a given tag and mapping of HTMLAttributes
+ * to HTMLAttributeValues.
+ * </p>
+ * 
+ * @note Use the attribute key, 'html' to the innerHTML of the new element.
+ * @note Use the attribute key, 'class' in quotes or 'className' with/without
+ *       quotes to set the 'class' of the new element.
+ * @param {string} tag Type of document $element to create by tag name.
+ * @param {object} attrs Collection of HTMLAttributes add to the new
+ *            HTMLElement.
+ */
+$.build =
+    function(tag, attrs) {
+
+        attrs = attrs || {};
+        var $element = $(document.createElement(tag));
+
+        for ( var attr in attrs) {
+
+            var val = attrs[attr];
+            attr =
+                attr.replace(/^_|Name$/, '').replace(
+                    /([^A-Z ])([A-Z])(?=[a-z])/g, '$1-' + '$2'.toLowerCase());
+
+            switch (attr) {
+
+            case 'html':
+                $element.html(val);
+                break;
+
+            case 'style':
+
+                switch (typeof val) {
+
+                case 'object':
+                    for ( var style in val)
+                        $element.css(style, val[style]);
+                    break;
+
+                case 'string':
+                default:
+                    $element.attr(attr, val);
+                    break;
+
+                }
+
+                break;
+
+            case 'text':
+                $element.text(val);
+                break;
+
+            default:
+                $element.attr(attr, val);
+                break;
+
+            }
+
+        }
+        return $element;
+    }
+
+/**
+ * <p>
+ * Defines an enumerated type at runtime from a given type, array of enumerated
+ * names, and a bitwise flag indicating whether to make the enumeration a
+ * bitmask.
+ * </p>
+ * 
+ * @param {string} type
+ * @param {array|object} names
+ * @param {boolean} bitwise
+ * @returns {object} The enumerated type object.
+ */
+$.enumerate =
+    function(type, names, bitwise) {
+
+        if (bitwise == null) bitwise = false;
+        eval((type.indexOf('.') > 0 ? '' : 'var ') + type + ' = {};');
+
+        var i = 0;
+        for ( var name in names) {
+
+            var value = names[name], cmd = type + '["' + name + '"] = ';
+
+            switch (value) {
+
+            case 'MAX_VALUE':
+                cmd +=
+                    '(function() { var total = 0; for(var name in ' + type +
+                        ') { total += ' + type +
+                        '[name]; }; return total; })();'
+                break;
+
+            default:
+                cmd +=
+                    value != null ? value : (bitwise
+                        ? (i == 0 ? 1 : (1 << (i))) : i + 1) +
+                        ';';
+                break;
+
+            }
+
+            eval(cmd);
+            ++i;
+        }
+
+        return eval(type);
+
+    }
+
+/*******************************************************************************
+ * jQuery Instance Methods
+ ******************************************************************************/
+
+/**
+ * Adjusts the width of each step header in a bootstrap form wizard so that they
+ * fill the entire horizontal space in a single row.
+ * 
+ * @return {void}
+ */
+$.fn.adjustStepHeaders = function() {
+    var targets = $(this).find('.steps li');
+    targets.each(function(i, e) {
+        $(this).css('width', (100 / targets.length) + "%");
+    });
+}
+
+/*******************************************************************************
+ * jQuery-DataTable Methods
+ ******************************************************************************/
+
+/**
+ * Adjust the columns of a given <code>HTMLTableElement</code> and any nested
+ * data tables inside of it.
+ * 
+ * @param {mixed} target Typically the table whose columns are to be adjusted.
+ *            If nothing is passed for this parameter the entire document body
+ *            is used instead.
+ * @returns {[HTMLTableElement]} the DOM elements affected by this operation.
+ */
+$.adjustDataTableColumns = function(target) {
+    target = target != null ? $(target) : $(document.body);
+    var affectedTables = [];
+    target.find('.dataTable').addBack().each(function(i, e) {
+        if (!(this[0] instanceof HTMLTableElement)) return;
+        affectedTables.push(this);
+        $(this).DataTable().columns.adjust();
+    });
+    return affectedTables;
+}
+
+/*******************************************************************************
+ * jQuery-HTMLElement Instance Methods
+ ******************************************************************************/
+
+/**
+ * Returns the raw HTML string representation of this HTMLElement.
+ * 
+ * @return {string} The raw HTML string representation of this HTMLElement.
+ */
+$.fn.toHTMLString = function() {
+    if (!$(this).DOMCheck()) return this.toString();
+    return this[0].outerHTML;
+}
+
+/**
+ * Returns the collection of option values contained in this HTMLSelectElement.
+ * 
+ * @param {array} options Options to set for this HTMLSelectElement. If nothing
+ *            is passed for this argument, this method will simply return the
+ *            collection of option values contained in this HTMLSelectElement.
+ * @return {array} The collection of option values contained in this
+ *         HTMLSelectElement.
+ */
+$.fn.options = function() {
+    if (!$(this).DOMCheck(HTMLSelectElement)) return [];
+    var options = [];
+    for (var i = 0; i < this[0].options.length; ++i)
+        options.push(this[0].options[i].value);
+    return options;
+}
+
+/**
+ * @param {integer} index Index to set the selectedIndex for this
+ *            HTMLSelectElement.
+ * @return {integer} The selectedIndex of this HTMLSelectElement.
+ */
+$.fn.selectedIndex = function(index) {
+    if (!$(this).DOMCheck(HTMLSelectElement)) return null;
+    if (index == null) {
+        return this[0].selectedIndex;
+    } else {
+        this[0].selectedIndex = index;
+        return index;
+    }
+}
+
+/**
+ * Returns the value of the selectedIndex of this HTMLSelectElement.
+ * 
+ * @param {mixed} value Value to set for the this HTMLSelectElement.
+ * @return {mixed|integer} Value of the option at the selectedIndex of this
+ *         HTMLSelectElement if `value = null` or is not passed; The
+ *         selectedIndex of this HTMLSelectElement if the passed value exists in
+ *         its options. `null` otherwise.
+ */
+$.fn.selectedValue = function(value) {
+    if (!$(this).DOMCheck(HTMLSelectElement)) return null;
+    if (value == null) {
+        return this[0].options[this[0].selectedIndex].value;
+    } else {
+        var options = this.options();
+        for (var i = 0; i < options.length; ++i) {
+            var option = options[i];
+            if (value == option) {
+                this[0].selectedIndex = i;
+                return i;
+            }
+        }
+    }
+}
+
+/**
+ * Returns the value of the selectedIndex of this HTMLSelectElement.
+ * 
+ * @param {mixed} value Value to set for the this HTMLSelectElement.
+ * @return {mixed|$.fn} Value of the option at the selectedIndex of this
+ *         HTMLSelectElement if `value = null` or is not passed; The
+ *         selectedIndex of this HTMLSelectElement if the passed value exists in
+ *         its options. `null` otherwise.
+ */
+$.fn.selectedOption = function(value) {
+    if (!$(this).DOMCheck(HTMLSelectElement)) return null;
+    if (value == null) {
+        return this[0].options[this[0].selectedIndex];
+    } else {
+        var options = this.options();
+        for (var i = 0; i < options.length; ++i) {
+            var option = options[i];
+            if (value == option) {
+                this[0].selectedIndex = i;
+                return $(this);
+            }
+        }
+    }
+}
+
+/**
+ * Makes this HTML element constrain its width and scroll width overflow.
+ * 
+ * @param {int|string} width to set as the max-width of this element. Passing no
+ *            argument for this parameter will simply set overflow-x to auto.
+ * @returns {$.fn} a jQuery wrapper object for method chaining.
+ */
+$.fn.scrollWidth = function(width) {
+    if (!$(this).DOMCheck()) return null;
+    if ($(this).parent() == null) $(this).wrap($.build('div'));
+    if (width != null) {
+        width = typeof width == 'number' ? width + 'px' : width;
+        $(this).parent().css('max-width', width);
+    }
+    $(this).parent().css('overflow-x', 'auto');
+    return $(this);
+}
+
+/**
+ * <p>
+ * Makes this HTML element constrain its height and scroll height overflow.
+ * </p>
+ * 
+ * @param {int|string} height to set as the max-width of this element. Passing
+ *            no argument for this parameter will simply set overflow-y to auto.
+ * @returns {$.fn} a jQuery wrapper object for method chaining.
+ */
+$.fn.scrollHeight = function(height) {
+    if (!$(this).DOMCheck()) return null;
+    if ($(this).parent() == null) $(this).wrap($.build('div'));
+    if (height != null) {
+        height = typeof height == 'number' ? height : height + 'px';
+        $(this).parent().css('max-height', height);
+    }
+    $(this).parent().css('overflow-y', 'auto');
+    return $(this);
+}
+
+/**
+ * @returns <code>true</code> IFF <code>this[0] instanceof type == true</code>
+ * @param {Node.Type} type default is <code>HTMLElement</code>
+ */
+$.fn.DOMCheck = function(type) {
+    type = type || HTMLElement;
+    return this[0] instanceof type;
+}
+
+/**
+ * @returns {integer} The keycode of a KeyboardEvent. <code>false</code>
+ *          otherwise.
+ */
+$.fn.keyCode = function() {
+    var e = this[0] || window.event;
+    return e.which || e.keyCode;
+}
+
+/**
+ * @returns {mixed|$.fn}
+ */
+$.fn.isChecked = function() {
+    return this[0].checked;
+}
+
+/**
+ * @returns {mixed|$.fn}
+ */
+$.fn.check = function(action) {
+    if (action == null) action = true;
+    this[0].checked = action;
+}
+
+/**
+ * @returns {mixed|$.fn}
+ */
+$.fn.uncheck = function() {
+    this[0].checked = false;
+}
+
+/**
+ * @returns {mixed|$.fn}
+ */
+$.fn.isDisabled =
+    function() {
+        return this[0].disabled || $(this).attr('disabled') ||
+            $(this).attr('readonly');
+    }
+
+/**
+ * @returns {mixed|$.fn}
+ */
+$.fn.disable = function(action) {
+    if (action == null) action = true;
+    if (action) {
+        $(this).attr('disabled', 'disabled');
+        $(this).attr('readonly', 'readonly');
+    } else {
+        $(this).removeAttr('disabled');
+        $(this).removeAttr('readonly');
+    }
+}
+
+/**
+ * @returns {mixed|$.fn}
+ */
+$.fn.enable = function() {
+    $(this).disable(false);
+}
+
+/**
+ * @param options
+ * @returns {boolean}
+ */
+$.fn.getFields =
+    function(options) {
+        options = options || {};
+        var filter = options.filter || "*";
+        var fields = [];
+        $(this).find('[aria-required=true]').filter(filter)
+            .each(
+                function(i, e) {
+                    if ($(this).attr('mask') == 'numerical' &&
+                        $(this).val() > 0) fields.push(this);
+                    else if ($(this).val() != null) {
+                        if ($(this).val().trim().length > 0) fields.push(this);
+                    }
+                });
+        return fields;
+    }
